@@ -41,6 +41,7 @@ Function Invoke-WebExfiltration {
     #>
 
     [cmdletbinding()]
+    [alias("IWE")]
     Param(
         [Parameter(
                 Position = 0,
