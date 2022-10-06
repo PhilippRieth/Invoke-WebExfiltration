@@ -54,7 +54,7 @@ Function Invoke-WebExfiltration {
                 Mandatory = $false
         #ValueFromPipelineByPropertyName=$true
         )]
-        [string[]]$Target = 'https://pr.seceit.net',
+        [string[]]$Target = 'TARGET_PLACEHOLDER',
         [string]$Password,
         [string]$Proxy
     )
