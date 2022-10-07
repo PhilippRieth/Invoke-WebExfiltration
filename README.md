@@ -1,16 +1,16 @@
 # Invoke-WebExfiltration
-PowerShell function to exfiltrate data via HTTP(s) POST request (with file gzip compression and AES-256 encryption)
+Exfiltrate data via PowerShell HTTP(s) POST request (with file gzip compression and AES-256 encryption)
 
 Exfiltrate files to a remote server in a secure, encrypted way
 
 
-## Description
+# Description
 
-## Features
+# Features
 
 
 
-## Technical details / design thoughts
+# Technical details / design thoughts
 
 - File encryption
   - File names and file content is encrypted with AES-256
@@ -32,4 +32,39 @@ Exfiltrate files to a remote server in a secure, encrypted way
   - The tool keeps the identical folder structure as it exists on the client
 
 
-## Examples
+
+# Help
+```bash
+...
+```
+
+
+# Installation
+
+## Linux
+```bash
+git clone https://github.com/PhilippRieth/Invoke-WebExfiltration.git
+cd Invoke-WebExfiltration
+pip3 install virtualenv
+virtualenv -p python3 venv
+source venv/bin/active
+pip install -r requirements.txt
+```
+
+## Windows
+```powershell
+git clone https://github.com/PhilippRieth/Invoke-WebExfiltration.git
+cd Invoke-WebExfiltration
+
+pip3.exe install virtualenv
+virtualenv.exe -p python3 venv
+.\venv\Scripts\activate.ps1
+
+pip install -r requirements.txt
+```
+
+# Usage & Examples
+
+```powershell
+...
+```

@@ -1,6 +1,5 @@
 #!/usr/bin/python3
 import gzip
-import os
 import random
 import string
 import signal
@@ -12,16 +11,25 @@ import hashlib
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
 from flask import Flask, request, Response
+import ssl
+from OpenSSL import crypto
+import os
+import shutil
 
 author = "Philipp Rieth"
 version = "0.2"
-default_port = 8000
-default_targetdir = f"{os.getcwd()}/loot/"
-
+DEFAULT_PORT = 8000
+DEFAULT_TARGETDIR = f"{os.getcwd()}/loot/"
+DEFAULT_CERT_TMP_DIR = f'{os.getcwd()}/tmp_certificate'
+DEFAULT_CERTIFICATE_CRT = f'{DEFAULT_CERT_TMP_DIR}/cert.crt'
+DEFAULT_CERTIFICATE_KEY = f'{DEFAULT_CERT_TMP_DIR}/cert.key'
 
 def signal_handler(sig, frame):
     print('\n\nCtrl+C detected, exiting...')
-    sys.exit(1)
+    if os.path.isdir(DEFAULT_CERT_TMP_DIR):
+        print("Cleaning up temp certificates...")
+        shutil.rmtree(DEFAULT_CERT_TMP_DIR)
+    sys.exit(0)
 
 
 def parse_args():
@@ -32,34 +40,49 @@ def parse_args():
     parser.add_argument('-a', "--address",
                         required=False,
                         type=str,
-                        help='The domain, hostname or IP address that will be embedded into the PowerShell script. Default: local IP address')
+                        help='The domain, hostname or IP address that will be embedded into the PowerShell script.\n'
+                             'Default: local IP address')
 
     parser.add_argument('-p', "--port",
                         required=False,
                         type=str,
-                        help=f'Listening port that will be used. Default: {default_port}')
+                        help=f'Listening port that will be used.\n'
+                             f'Default: {DEFAULT_PORT}')
 
     parser.add_argument('-P', '--password',
                         required=False,
                         type=str,
-                        help='Password to use for decryption. Default: generate random password')
+                        help='Password to use for decryption.\n'
+                             'Default: generate random password')
 
     parser.add_argument('-t', '--targetdir',
                         required=False,
                         type=str,
-                        help=f"Loot directory to store the exfiltrated files in. Default: '{default_targetdir}'")
+                        help=f"Loot directory to store the exfiltrated files in.\n"
+                             f"Default: '{DEFAULT_TARGETDIR}'")
+
+    parser.add_argument('--crt',
+                        required=False,
+                        type=str,
+                        help=f"Path to custom certificate (.crt)")
+
+    parser.add_argument('--key',
+                        required=False,
+                        type=str,
+                        help=f"Path to custom certificate private key (.key)")
 
     parser.add_argument('--http',
                         required=False,
                         action='store_true',
                         default=False,
-                        help='Use HTTP instead of HTTPS. Default: HTTPS')
+                        help='Use HTTP instead of HTTPS.\n'
+                             'Default: HTTPS')
 
     parser.add_argument('--verbose',
                         required=False,
                         action='store_true',
                         default=False,
-                        help='Print verbose information on console. Default: False')
+                        help='Print verbose information on console.\nDefault: False')
 
     return parser
 
@@ -71,14 +94,18 @@ def validate_args(parser):
         args.password = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
 
     if not args.port:
-        args.port = default_port
+        args.port = DEFAULT_PORT
 
     if not args.address:
         args.address = socket.gethostbyname(socket.gethostname())
 
     if not args.targetdir:
-        args.targetdir = default_targetdir
+        args.targetdir = DEFAULT_TARGETDIR
 
+    # stupid XOR
+    if (not args.crt and args.key) or (args.crt and not args.key):
+        print("Error: You need to specify both, '--crt' and '--key'")
+        exit(1)
     return args
 
 
@@ -165,6 +192,44 @@ class IWE:
         return self.__aes256_decrypt_bytes(gzip_decoded)
 
 
+def cert_gen():
+    """
+    openssl req -newkey rsa:4096 -x509 -sha256 -days 3650 -nodes  -out certificate.crt -keyout certificate.key
+    :return:
+    """
+    # create a key pair
+    k = crypto.PKey()
+    k.generate_key(crypto.TYPE_RSA, 2048)
+    # create a self-signed cert
+    cert = crypto.X509()
+    cert.get_subject().C = "AU"  # countryName
+    cert.get_subject().ST = "-"  # stateOrProvinceName
+    cert.get_subject().L = "-"  # localityName
+    cert.get_subject().O = "-"  # organizationName
+    cert.get_subject().OU = "-"  # organizationUnitName
+    cert.get_subject().CN = "IWE"  # commonName
+    cert.get_subject().emailAddress = "-"  # emailAddress
+    cert.set_serial_number(0)
+    cert.gmtime_adj_notBefore(0)
+    cert.gmtime_adj_notAfter(365*24*60*60)
+    cert.set_issuer(cert.get_subject())
+    cert.set_pubkey(k)
+    cert.sign(k, 'sha512')
+    if not os.path.isdir(DEFAULT_CERT_TMP_DIR):
+        os.makedirs(DEFAULT_CERT_TMP_DIR)
+
+    with open(DEFAULT_CERTIFICATE_CRT, "wt") as f:
+        f.write(crypto.dump_certificate(crypto.FILETYPE_PEM, cert).decode("utf-8"))
+    with open(DEFAULT_CERTIFICATE_KEY, "wt") as f:
+        f.write(crypto.dump_privatekey(crypto.FILETYPE_PEM, k).decode("utf-8"))
+
+    # create in-memory file objects of the generated certificates
+    # crt = io.StringIO(crypto.dump_certificate(crypto.FILETYPE_PEM, cert).decode("utf-8"))
+    # key = io.StringIO(crypto.dump_privatekey(crypto.FILETYPE_PEM, k).decode("utf-8"))
+    # crt = crypto.dump_certificate(crypto.FILETYPE_PEM, cert).decode("utf-8")
+    # key = crypto.dump_privatekey(crypto.FILETYPE_PEM, k).decode("utf-8")
+
+
 def main():
     art = """
  _____  ____      ____  ________  
@@ -247,7 +312,6 @@ def main():
 
         return Response(iwe_file, status=200)
 
-
     if args.http:
         app.run(host='0.0.0.0', port=args.port)
     else:
@@ -256,8 +320,24 @@ def main():
         # if args.crt and args.key:
         #   ssl_context = ('local.crt', 'local.key')
 
-        app.run(host='0.0.0.0', port=args.port, ssl_context=ssl_context, )
+        # context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        # context.set_ciphers('ECDHE+AESGCM:!ECDSA')
 
+        # context.get_ciphers()
+
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
+
+        if args.crt and args.key:
+            context.load_cert_chain(certfile=args.crt, keyfile=args.key)
+        else:
+            cert_gen()
+            context.load_cert_chain(certfile=DEFAULT_CERTIFICATE_CRT, keyfile=DEFAULT_CERTIFICATE_KEY)
+
+        #context = ssl.SSLContext()
+
+        app.run(host='0.0.0.0', port=args.port, ssl_context=context)
+        # serve(app, host='0.0.0.0', port=args.port, url_scheme='https')
 
 if __name__ == "__main__":
     main()
