@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
-from distutils.core import setup
-import setuptools
+from setuptools import setup, find_packages
+
 
 setup(name='Invoke-WebExfiltration',
       version='0.1',
       description='Exfiltrate data via PowerShell HTTP(s) POST request (with file gzip compression and AES-256 encryption)',
       author='Philipp Rieth',
       url='https://github.com/PhilippRieth/Invoke-WebExfiltration',
-      packages=setuptools.find_packages(),
+      packages=find_packages(),
       entry_points={
             'console_scripts': [
                   'iwe-server=iwe-server:main'
