@@ -65,8 +65,7 @@ Function Invoke-WebExfiltration {
             Write-Host "[!] Using HTTP proxy: '$Proxy'"
         }
         if ((-Not $Password) -And (-Not $unencrypted)) {
-            # $Password = Read-Host -AsSecureString "Password"
-            $Password = Read-Host -MaskInput "[*] Password"
+            $Password = Read-Host -MaskInput '[*] Password'
 
             if (-Not $Password){
                 Write-Host "[!] You provided an empty password! Files and file names will not be encrypted."
@@ -206,12 +205,12 @@ Function Invoke-WebExfiltration {
              Break
 
         }
-        catch {
-            Write-Host "[X] Error: An unknown error occured! $($_.Exception.GetType().FullName)"
-            Write-Host "[X] Error: StatusCode:  $($_.Exception.Response.StatusCode.value__)"
-            Write-Host "[X] Error: StatusDescription:  $($_.Exception.Response.StatusDescription)"
-            Write-Host "[X] Error: I've no idea what's going on :("
-            break
+        #catch {
+        #    Write-Host "[X] Error: An unknown error occured! $($_.Exception.GetType().FullName)"
+        #    Write-Host "[X] Error: StatusCode:  $($_.Exception.Response.StatusCode.value__)"
+        #    Write-Host "[X] Error: StatusDescription:  $($_.Exception.Response.StatusDescription)"
+        #    Write-Host "[X] Error: I've no idea what's going on :("
+        #    break
         }
 
          # Some return code handling
