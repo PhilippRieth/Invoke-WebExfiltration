@@ -298,7 +298,9 @@ def main():
             file_full_path = iwe.aes256_decrypt_filename(content['fn'])
             plaintext_bytes = iwe.aes256_decrypt_binary(content['ct'])
         except CouldNotDecryptError:
-            return Response('Could not decrypt. Wrong password?', status=400)
+            return Response('Error: Could not decrypt. Wrong password?', status=400)
+        except TypeError:
+            return Response('Error: The received body looks wrong', status=400)
 
         dirs = os.path.dirname(file_full_path).replace(':', '')
         filename = os.path.basename(file_full_path)
@@ -313,7 +315,7 @@ def main():
         with open(os.path.join(args.targetdir, client_folder_name, dirs, filename), "wb") as f:
             f.write(plaintext_bytes)
 
-        return Response('Could not decrypt. Wrong password?', status=200)
+        return Response('Thanks!', status=200)
 
     @app.route('/')
     @app.errorhandler(404)
