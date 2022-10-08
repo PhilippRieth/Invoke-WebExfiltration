@@ -211,7 +211,7 @@ Function Invoke-WebExfiltration {
         #    Write-Host "[X] Error: StatusDescription:  $($_.Exception.Response.StatusDescription)"
         #    Write-Host "[X] Error: I've no idea what's going on :("
         #    break
-        }
+        #}
 
          # Some return code handling
          if ($response.StatusCode -ne '200'){
