@@ -98,7 +98,7 @@ optional arguments:
 
 ## Invoke-WebExfiltration.ps1
 ```powershell
-PS > Get-Help Invoke-WebExfiltration
+PS >  Get-Help Invoke-WebExfiltration -Detailed
 
 NAME
     Invoke-WebExfiltration
@@ -108,18 +108,29 @@ SYNOPSIS
     (with file gzip compression and AES-256 encryption)
     Author: Philipp Rieth
 
-SYNTAX
-    Invoke-WebExfiltration [-File] <Object> [[-Target] <String>] [-Password <String>] [-Insecure] [<CommonParameters>]
 
+SYNTAX
+    Invoke-WebExfiltration [-File] <Object> [[-Target] <String>] [-Password <String>] [-IgnoreCertificateCheck] [<CommonParameters>]
+
+PARAMETERS
+    -File <Object>
+
+    -Target <String>
+        Specifices the target URL. Needs to be http(s)://<host>:<port>/sendfile
+
+    -Password <String>
+        The passworld used for data encryption
+
+    -IgnoreCertificateCheck [<SwitchParameter>]
+    
 RELATED LINKS
-    GitHub: https://github.com/PhilippRieth/Invoke-WebExfiltration
     GitHub: https://github.com/PhilippRieth/Invoke-WebExfiltration
 
 REMARKS
-    To see the examples, type: "Get-Help Invoke-WebExfiltration -Examples"
-    For more information, type: "Get-Help Invoke-WebExfiltration -Detailed"
-    For technical information, type: "Get-Help Invoke-WebExfiltration -Full"
-    For online help, type: "Get-Help Invoke-WebExfiltration -Online"
+    To see the examples, type: "get-help Invoke-WebExfiltration -examples".
+    For more information, type: "get-help Invoke-WebExfiltration -detailed".
+    For technical information, type: "get-help Invoke-WebExfiltration -full".
+    For online help, type: "get-help Invoke-WebExfiltration -online"    
 ```
 
 # Installation
