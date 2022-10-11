@@ -3,7 +3,7 @@ Exfiltrate data via PowerShell HTTP(s) POST request (with file gzip compression 
 
 
 # Description
-Invoke-WebExfiltration is a convince tools which makes exfiltrating via PowerShell to a remote server quite a bit easier during Red Team assessments. 
+Invoke-WebExfiltration is a convince tools which makes exfiltrating files via PowerShell to a remote server a bit easier during Red Team assessments (or similar). 
 Data is transferred via HTTP(S) POST requests, with a JSON body containing the information.
 All data is AES-256 encrypted which makes file exfiltration even via HTTP secure. 
 Furthermore, even with TLS stripping the firewall / proxy can't see want data is being transferred. 
@@ -15,7 +15,6 @@ Files can also be exfiltrated through a web proxy (with none, NTLM, Kerberos or 
 - Easy to use
 - Strong AES-256 encryption
 - Gzip compression
-- 
 
 
 # Technical details / design thoughts
@@ -28,29 +27,34 @@ Files can also be exfiltrated through a web proxy (with none, NTLM, Kerberos or 
 
 - Gzip compression
   - After encryption the binary data is compressed via Gzip.
-  - It's quick for not too large files and reduces the size by a good few percent
+  - Compression is fast for not too large files and reduces the size by a good few percent
+  
+- Base64 encoding
+  - The encrypted, compress binary data is base64 encoded for transfer via HTTP(s) POST request 
 
 - No password protection for file upload
-  - The server will only accept data from POST requests which it can successfully decrypt. 
+  - The server will only accept data from POST requests from which it can which can successfully decrypt the cipher text.
   - It tests that first on the file name.
   - If the content can't be decrypted the file name the file binary will be ignored and is discarded.
   - I kind of see that as a password protection 'light' for the file upload to prevent unwanted uploads from 3rd parties.
 
 - Loot folder structure
   - The tool keeps the identical folder structure as it exists on the client
+  - The folder will loots dir for the device will be named after the connection IP_HOSTNAME_WINDOWS-VERSION_USERNAME
 
 - No direct proxy support
   - The tools has no direct proxy support as there are too many scenarios 
-  - This should rather be setup in the current PowerShell session. 
+  - THe proxy enviroument should rather be setup in the current PowerShell session. 
   - See examples on how to do that
 
 # ToDo:
 - I'm unhappy with the way SSL/HTTPS is done. Needs improvement
 - Add some sort of file upload restriction (Basic Auth?)
 
-
 # Limitations
 - Large files (100MB) should be split into chunks and then exfiltrated (see examples)
+- It works, but takes ages. 
+- Furthermore the whole file needs to be kept im memory by the server
 
 # Help
 
