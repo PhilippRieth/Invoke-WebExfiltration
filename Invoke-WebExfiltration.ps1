@@ -80,7 +80,7 @@ Function Invoke-WebExfiltration
 
     Process {
         if (-not (Test-Path -Path $file )){
-            Write-Host "[X] Error: '$file' does not exist."
+            Write-Host "[X] Error: '$file' does not exist. Did you specifiy the full path?"
             break
         }
 
