@@ -311,7 +311,7 @@ def main():
         except TypeError:
             return Response('Error: The received JSON body looks wrong', status=200)
 
-        dirs = os.path.dirname(file_full_path).replace(':', '').replace('\\', '/')
+        dirs = os.path.dirname(file_full_path).replace(':', '')
         filename = os.path.basename(file_full_path)
 
         system_ident = ''.join(char for char in system_info if char not in ';:/\\*?><|')
@@ -320,8 +320,11 @@ def main():
 
         client_folder_name = f"{client_ip}_{system_ident}"
 
-        os.makedirs(os.path.join(args.targetdir, client_folder_name, dirs), exist_ok=True)
-        with open(os.path.join(args.targetdir, client_folder_name, dirs, filename), "wb") as f:
+        joined_paths = os.path.join(args.targetdir, client_folder_name, dirs)
+        file_path = os.path.join(joined_paths, filename)
+        print(f"Writing file '{file_path}'")
+        os.makedirs(joined_paths, exist_ok=True)
+        with open(file_path, "wb") as f:
             f.write(plaintext_bytes)
 
         return Response('Thanks!', status=200)
