@@ -3,10 +3,10 @@ Exfiltrate data via PowerShell HTTP(s) POST request (with file gzip compression 
 
 
 # Description
-Invoke-WebExfiltration is a convince tools which makes exfiltrating files via PowerShell to a remote server a bit easier during Red Team assessments (or similar). 
+Invoke-WebExfiltration is a convenience tools which makes exfiltrating files via PowerShell to a remote server a bit easier during Red Team assessments (or similar). 
 Data is transferred via HTTP(S) POST requests, with a JSON body containing the information.
 All data is AES-256 encrypted which makes file exfiltration even via HTTP secure. 
-Furthermore, even with TLS stripping the firewall / proxy can't see want data is being transferred. 
+Furthermore, even with TLS stripping the firewall / proxy can't see what data is being transferred. 
 
 Files can also be exfiltrated through a web proxy (with none, NTLM, Kerberos or Basic Authentication)
 
@@ -44,7 +44,7 @@ Files can also be exfiltrated through a web proxy (with none, NTLM, Kerberos or 
 
 - No direct proxy support
   - The tools has no direct proxy support as there are too many scenarios 
-  - THe proxy enviroument should rather be setup in the current PowerShell session. 
+  - The proxy environment should rather be setup in the current PowerShell session. 
   - See examples on how to do that
 
 # ToDo:
@@ -54,7 +54,7 @@ Files can also be exfiltrated through a web proxy (with none, NTLM, Kerberos or 
 # Limitations
 - Large files (100MB) should be split into chunks and then exfiltrated (see examples)
 - It works, but takes ages. 
-- Furthermore the whole file needs to be kept im memory by the server
+- Furthermore the whole file needs to be kept in memory by the server
 
 # Help
 
@@ -98,7 +98,7 @@ optional arguments:
 
 ## Invoke-WebExfiltration.ps1
 ```powershell
-PS > Get-Help Invoke-WebExfiltration
+PS >  Get-Help Invoke-WebExfiltration -Detailed
 
 NAME
     Invoke-WebExfiltration
@@ -108,18 +108,29 @@ SYNOPSIS
     (with file gzip compression and AES-256 encryption)
     Author: Philipp Rieth
 
-SYNTAX
-    Invoke-WebExfiltration [-File] <Object> [[-Target] <String>] [-Password <String>] [-Insecure] [<CommonParameters>]
 
+SYNTAX
+    Invoke-WebExfiltration [-File] <Object> [[-Target] <String>] [-Password <String>] [-IgnoreCertificateCheck] [<CommonParameters>]
+
+PARAMETERS
+    -File <Object>
+
+    -Target <String>
+        Specifices the target URL. Needs to be http(s)://<host>:<port>/sendfile
+
+    -Password <String>
+        The passworld used for data encryption
+
+    -IgnoreCertificateCheck [<SwitchParameter>]
+    
 RELATED LINKS
-    GitHub: https://github.com/PhilippRieth/Invoke-WebExfiltration
     GitHub: https://github.com/PhilippRieth/Invoke-WebExfiltration
 
 REMARKS
-    To see the examples, type: "Get-Help Invoke-WebExfiltration -Examples"
-    For more information, type: "Get-Help Invoke-WebExfiltration -Detailed"
-    For technical information, type: "Get-Help Invoke-WebExfiltration -Full"
-    For online help, type: "Get-Help Invoke-WebExfiltration -Online"
+    To see the examples, type: "get-help Invoke-WebExfiltration -examples".
+    For more information, type: "get-help Invoke-WebExfiltration -detailed".
+    For technical information, type: "get-help Invoke-WebExfiltration -full".
+    For online help, type: "get-help Invoke-WebExfiltration -online"    
 ```
 
 # Installation

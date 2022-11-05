@@ -10,7 +10,7 @@ Function Invoke-WebExfiltration
         GitHub: https://github.com/PhilippRieth/Invoke-WebExfiltration
 
         .PARAMETER Target
-        Specifices the target URL. Needs to be http(s)://<host>:<port>/sendfile
+        Specifices the target URL. Default value is already filled out. Needs to be http(s)://<host>:<port>/sendfile
 
         .PARAMETER Password
         The passworld used for data encryption
