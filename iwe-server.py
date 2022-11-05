@@ -311,7 +311,8 @@ def main():
         except TypeError:
             return Response('Error: The received JSON body looks wrong', status=200)
 
-        dirs = os.path.dirname(file_full_path).replace(':', '')
+        file_full_path = file_full_path.replace(':', '').replace('\\', '/')
+        dirs = os.path.dirname(file_full_path)
         filename = os.path.basename(file_full_path)
 
         system_ident = ''.join(char for char in system_info if char not in ';:/\\*?><|')
